@@ -1,0 +1,7 @@
+data/github.aeldemery.gtk4_layoutmanager_transformation.desktop.in
+data/github.aeldemery.gtk4_layoutmanager_transformation.appdata.xml.in
+data/github.aeldemery.gtk4_layoutmanager_transformation.gschema.xml
+src/window.ui
+src/main.vala
+src/window.vala
+
