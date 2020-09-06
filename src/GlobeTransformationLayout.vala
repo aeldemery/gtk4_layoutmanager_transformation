@@ -74,10 +74,10 @@ public class Gtk4LayoutmanagerTransformation.GlobeTransformationLayout : Gtk.Lay
             p3 = { 0f, 0f, 1f };
             p4 = { 0f, h, 1f };
 
-            t_1 = MathHelper.angle_to_radiants (MathHelper.map_offset (offset + 10 * j));
-            t_2 = MathHelper.angle_to_radiants (MathHelper.map_offset (offset + 10 * (j + 1)));
-            p_1 = MathHelper.angle_to_radiants (position + 10 * k);
-            p_2 = MathHelper.angle_to_radiants (position + 10 * (k + 1));
+            t_1 = MathHelper.angle_to_radiants (MathHelper.map_offset (this.offset + 10 * j));
+            t_2 = MathHelper.angle_to_radiants (MathHelper.map_offset (this.offset + 10 * (j + 1)));
+            p_1 = MathHelper.angle_to_radiants (this.position + 10 * k);
+            p_2 = MathHelper.angle_to_radiants (this.position + 10 * (k + 1));
 
             if (t_2 < t_1) {
                 continue;
@@ -119,8 +119,8 @@ public class Gtk4LayoutmanagerTransformation.GlobeTransformationLayout : Gtk.Lay
             /* Get a matrix that moves p1 -> q1, p2 -> q2, ... */
             MathHelper.perspective_3d (p1, p2, p3, p4,
                                        q1, q2, q3, q4,
-                                       ref m);
-
+                                       out m);
+            
             transform = transform.matrix (m);
 
             /* Since our matrix was built for transforming points with z = 1,

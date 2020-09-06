@@ -30,11 +30,15 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         return r * Math.cos (t);
     }
 
-    /* Make a 4x4 matrix that maps
+    /* Compute a 4x4 matrix m that maps
      * p1 -> q1
      * p2 -> q2
      * p3 -> q3
      * p4 -> q4
+     *
+     * This is not in general possible, because projective
+     * transforms preserve coplanarity. But in the cases we
+     * care about here, both sets of points are always coplanar.
      */
     public static void perspective_3d (Graphene.Point3D p1,
                                        Graphene.Point3D p2,
@@ -44,14 +48,14 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
                                        Graphene.Point3D q2,
                                        Graphene.Point3D q3,
                                        Graphene.Point3D q4,
-                                       ref Graphene.Matrix m) {
+                                       out Graphene.Matrix m) {
 
         Graphene.Matrix a, a_inv, b;
 
-        a = {}; b = {};
+        a = {}; b = {}; a_inv = {};
 
-        unit_to (p1, p2, p3, p4, ref a);
-        unit_to (q1, q2, q3, q4, ref b);
+        unit_to (p1, p2, p3, p4, out a);
+        unit_to (q1, q2, q3, q4, out b);
 
         a.inverse (out a_inv);
         m = a_inv.multiply (b);
@@ -67,17 +71,17 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
                          Graphene.Point3D p2,
                          Graphene.Point3D p3,
                          Graphene.Point3D p4,
-                         ref Graphene.Matrix m) {
+                         out Graphene.Matrix m) {
         Graphene.Vec3 v1, v2, v3, v4;
         Graphene.Vec4 vv1, vv2, vv3, vv4, p;
         Graphene.Matrix u, s;
-        float v[16] = { 0f, };
-        double A[16];
-        double U[16];
-        double S[4];
-        double V[16];
-        double B[4];
-        double x[4];
+        float[] v = new float[16]; v = { 0f, };
+        double[] A = new double[16];
+        double[] U = new double[16];
+        double[] S = new double[4];
+        double[] V = new double[16];
+        double[] B = new double[4];
+        double[] x = new double[4];
 
         v1 = p1.to_vec3 ();
         v2 = p2.to_vec3 ();
@@ -110,8 +114,8 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         B[2] = vv4.get_z ();
         B[3] = vv4.get_w ();
 
-        singular_value_decomposition (A, 4, 4, ref U, ref S, ref V);
-        singular_value_decomposition_solve (ref U, ref S, ref V, 4, 4, ref B, ref x);
+        //singular_value_decomposition (A, 4, 4, out U, out S, out V);
+        //singular_value_decomposition_solve (U, S, V, 4, 4, B, out x);
 
         v[0] = (float) x[0];
         v[5] = (float) x[1];
@@ -123,19 +127,30 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         m = s.multiply (u);
     }
 
+    /* Compute a singular value decomposition of A,
+     * A = U*Diag(S)*Vt
+     *
+     * All matrices are allocated by the caller
+     *
+     * Sizes:
+     *  A, U: nrows x ncols
+     *  S: ncols
+     *  V: ncols x ncols
+     */
     public static int singular_value_decomposition (double[] A,
                                                     int nrows,
                                                     int ncols,
-                                                    ref double[] U,
-                                                    ref double[] S,
-                                                    ref double[] V) {
+                                                    out double[] U,
+                                                    out double[] S,
+                                                    out double[] V) {
 
-        var superdiagonal = new double[ncols];
+        double[] superdiagonal = new double[ncols];
 
-        if (nrows < ncols)
+        if (nrows < ncols) {
             return -1;
+        }
 
-        householder_reduction (A, nrows, ncols, ref U, ref V, ref S, ref superdiagonal);
+        householder_reduction (A, nrows, ncols, out U, out V, out S, out superdiagonal);
 
         if (givens_reduction (nrows, ncols, ref U, ref V, ref S, ref superdiagonal) < 0)
             return -1;
@@ -145,19 +160,33 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         return 0;
     }
 
-    static void singular_value_decomposition_solve (ref double[] U,
-                                                    ref double[] S,
-                                                    ref double[] V,
+    /*
+     * Given a singular value decomposition of A = U*Diag(S)*Vt,
+     * compute the best approximation x to A*x = B.
+     *
+     * All matrices are allocated by the caller
+     *
+     * Sizes:
+     *  U: nrows x ncols
+     *  S: ncols
+     *  V: ncols x ncols
+     *  B, x: ncols
+     */
+    static void singular_value_decomposition_solve (double[] U,
+                                                    double[] S,
+                                                    double[] V,
                                                     int nrows,
                                                     int ncols,
-                                                    ref double[] B,
-                                                    ref double[] x) {
+                                                    double[] B,
+                                                    out double[] x) {
 
         int i, j, k;
         double * pu;
         double * pv;
         double d;
         double tolerance;
+
+        x = {};
 
         tolerance = double.EPSILON * S[0] * (double) ncols;
 
@@ -173,6 +202,11 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         }
     }
 
+    /* Given a singular value decomposition
+     * of an nrows x ncols matrix A = U*Diag(S)*Vt,
+     * sort the values of S by decreasing value,
+     * permuting V to match.
+     */
     static void sort_singular_values (int nrows,
                                       int ncols,
                                       ref double[] S,
@@ -214,6 +248,20 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         }
     }
 
+    /* Perform Givens reduction
+     *
+     * Input: Matrices such that
+     * A = U*Bidiag(diagonal,superdiagonal)*Vt
+     *
+     * Output: The same, with superdiagonal = 0
+     *
+     * All matrices are allocated by the caller
+     *
+     * Sizes:
+     *  U: nrows x ncols
+     *  diagonal, superdiagonal: ncols
+     *  V: ncols x ncols
+     */
     static int givens_reduction (int nrows,
                                  int ncols,
                                  ref double[] U,
@@ -335,13 +383,27 @@ private class Gtk4LayoutmanagerTransformation.MathHelper {
         return 0;
     }
 
+    /* Perform Householder reduction to bidiagonal form
+     *
+     * Input: Matrix A of size nrows x ncols
+     *
+     * Output: Matrices and vectors such that
+     * A = U*Bidiag(diagonal, superdiagonal)*Vt
+     *
+     * All matrices are allocated by the caller
+     *
+     * Sizes:
+     *  A, U: nrows x ncols
+     *  diagonal, superdiagonal: ncols
+     *  V: ncols x ncols
+     */
     static void householder_reduction (double[] A,
                                        int nrows,
                                        int ncols,
-                                       ref double[] U,
-                                       ref double[] V,
-                                       ref double[] diagonal,
-                                       ref double[] superdiagonal) {
+                                       out double[] U,
+                                       out double[] V,
+                                       out double[] diagonal,
+                                       out double[] superdiagonal) {
         int i, j, k, ip1;
         double s, s2, si, scale;
         double * pu;

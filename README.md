@@ -7,7 +7,7 @@
 
 ## About <a name = "about"></a>
 
-Currently brocken because of complex linear algebra math :).
+Currently broken because of complex linear algebra math :).
 
 ### Prerequisites
 
