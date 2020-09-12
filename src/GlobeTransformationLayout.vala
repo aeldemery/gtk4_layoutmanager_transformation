@@ -117,9 +117,7 @@ public class Gtk4LayoutmanagerTransformation.GlobeTransformationLayout : Gtk.Lay
             };
 
             /* Get a matrix that moves p1 -> q1, p2 -> q2, ... */
-            MathHelper.perspective_3d (p1, p2, p3, p4,
-                                       q1, q2, q3, q4,
-                                       out m);
+            MathHelper.perspective_3d (p1, p2, p3, p4, q1, q2, q3, q4, ref m);
             
             transform = transform.matrix (m);
 
